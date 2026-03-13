@@ -708,6 +708,21 @@ end
     end
 end
 
+"""
+$(TYPEDSIGNATURES)
+Zeros the first mode (l=m=1, index 1) of a LowerTriangularArray `L` for mass conservation.
+Sets all elements at the first spectral index to zero across all trailing dimensions."""
+function zero_first_mode!(L::LowerTriangularArray)
+    arch = architecture(L)
+    launch!(arch, LinearWorkOrder, (1,), zero_first_mode_kernel!, L.data)
+    return nothing
+end
+
+@kernel inbounds = true function zero_first_mode_kernel!(data)
+    i = @index(Global, Linear)
+    data[i] = 0
+end
+
 Base.:(==)(L1::LowerTriangularArray, L2::LowerTriangularArray) =
     L1.spectrum == L2.spectrum && L1.data == L2.data
 Base.isapprox(L1::LowerTriangularArray, L2::LowerTriangularArray; kwargs...) =

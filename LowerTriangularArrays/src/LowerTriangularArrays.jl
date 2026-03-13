@@ -12,7 +12,7 @@ import KernelAbstractions: @kernel, @index
 import SpeedyWeatherInternals.Architectures: Architectures, AbstractArchitecture, on_architecture,
     array_type, ismatching, CPU, GPU, architecture, nonparametric_type
 
-import SpeedyWeatherInternals.Utils: launch!, SpectralWorkOrder
+import SpeedyWeatherInternals.Utils: launch!, SpectralWorkOrder, LinearWorkOrder
 
 # NUMERICS
 import LinearAlgebra: tril!
@@ -23,7 +23,7 @@ export LowerTriangularMatrix, LowerTriangularArray
 export eachharmonic, eachmatrix, eachorder, orders
 export OneBased, ZeroBased
 export lta_view
-export zero_last_degree!
+export zero_last_degree!, zero_first_mode!
 
 include("spectrum.jl")
 include("lower_triangular_array.jl")

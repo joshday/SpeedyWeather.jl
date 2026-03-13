@@ -21,11 +21,11 @@ nlayers_list = (8,) # 8, 32]
 # TODO: at the moment only tests for even grids (no ring on equator) pass for some reason
 grid_list = [
     FullGaussianGrid,
-    # FullClenshawGrid,
+    FullClenshawGrid,
     OctahedralGaussianGrid,
     OctahedralClenshawGrid,
-    # HEALPixGrid,
-    # OctaHEALPixGrid,
+    HEALPixGrid,
+    OctaHEALPixGrid,
 ]
 # CUDA.cu now implicitly converts to Float32 so that's the only relevant type to
 # test here
@@ -274,44 +274,47 @@ end
 end
 
 # NOTE: Currently failing due to problem with Float32 FFTW planning
-# @testset "fourier_serial: compare backward pass to CPU" begin
-#     @testset for trunc in spectral_resolutions
-#         @testset for nlayers in nlayers_list
-#             @testset for Grid in grid_list
-#                 @testset for NF in (Float32, Float64)
-#                     # Generate test data
-#                     S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
-#                         trunc=trunc, nlayers=nlayers, Grid=Grid, NF=NF
-#                     )
+@testset "fourier_serial: compare backward pass to CPU" begin
+    @testset for trunc in spectral_resolutions
+        @testset for nlayers in nlayers_list
+            @testset for Grid in grid_list
+                @testset for NF in NFs
+                    # Generate test data
+                    S_cpu, S_gpu, grid_cpu, grid_gpu, spec_cpu, spec_gpu = get_test_data(
+                        trunc = trunc, nlayers = nlayers, Grid = Grid, NF = NF
+                    )
 
-#                     # Use scratch memory to store mid-transform data, using the
-#                     # CPU legendre transform to generate the intermediate data
-#                     # NOTE: assumption of working Legendre transform
-#                     g_north_cpu = S_cpu.scratch_memory_north
-#                     g_south_cpu = S_cpu.scratch_memory_south
-#                     SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, S_cpu)
-#                     # Copy to GPU
-#                     g_north_gpu = cu(g_north_cpu)
-#                     g_south_gpu = cu(g_south_cpu);
+                    cpu_arch = S_cpu.architecture
+                    gpu_arch = S_gpu.architecture
 
-#                     # CPU inverse transform
-#                     SpeedyTransforms._fourier_serial!(
-#                         grid_cpu, g_north_cpu, g_south_cpu, S_cpu
-#                     )
-#                     # GPU inverse transform
-#                     SpeedyTransforms._fourier_serial!(
-#                         grid_gpu, g_north_gpu, g_south_gpu, S_gpu
-#                     )
+                    # Use scratch memory to store mid-transform data, using the
+                    # CPU legendre transform to generate the intermediate data
+                    # NOTE: assumption of working Legendre transform
+                    g_north_cpu = S_cpu.scratch_memory.north
+                    g_south_cpu = S_cpu.scratch_memory.south
+                    SpeedyTransforms._legendre!(g_north_cpu, g_south_cpu, spec_cpu, S_cpu.scratch_memory.column, S_cpu)
+                    # Copy to GPU
+                    g_north_gpu = on_architecture(gpu_arch, g_north_cpu)
+                    g_south_gpu = on_architecture(gpu_arch, g_south_cpu)
 
-#                     # Copy back to CPU again for comparison
-#                     grid_gpu_compare = adapt(Array, grid_gpu)
+                    # CPU inverse transform
+                    SpeedyTransforms._fourier_serial!(
+                        grid_cpu, g_north_cpu, g_south_cpu, S_cpu
+                    )
+                    # GPU inverse transform
+                    SpeedyTransforms._fourier_serial!(
+                        grid_gpu, g_north_gpu, g_south_gpu, S_gpu
+                    )
 
-#                     @test grid_cpu ≈ grid_gpu_compare
-#                 end
-#             end
-#         end
-#     end
-# end
+                    # Copy back to CPU again for comparison
+                    grid_gpu_compare = on_architecture(cpu_arch, grid_gpu)
+
+                    @test grid_cpu ≈ grid_gpu_compare broken = true
+                end
+            end
+        end
+    end
+end
 
 @testset "legendre: compare inverse transform to CPU" begin
     @testset for NF in NFs

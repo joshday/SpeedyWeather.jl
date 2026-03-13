@@ -71,8 +71,9 @@ function dynamics_tendencies!(
     linear_virtual_temperature!(diagn, progn, lf_implicit, model)
 
     # temperature relative to profile
-    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (temp profile and temp_grid are different dimensions and array types)
-    diagn.grid.temp_grid.data .-= implicit.temp_profile'
+    arch = architecture(diagn.grid.temp_grid)
+    launch!(arch, RingGridWorkOrder, size(diagn.grid.temp_grid), subtract_profile_kernel!,
+        diagn.grid.temp_grid, implicit.temp_profile)
 
     # from ∂Φ/∂ln(pₛ) = -RTᵥ for bernoulli_potential!
     geopotential!(diagn, geopotential, orography)
@@ -108,9 +109,20 @@ function dynamics_tendencies!(
     tracer_advection!(diagn, model)
 
     # back to absolute temperature
-    diagn.grid.temp_grid.data .+= implicit.temp_profile'
+    launch!(arch, RingGridWorkOrder, size(diagn.grid.temp_grid), add_profile_kernel!,
+        diagn.grid.temp_grid, implicit.temp_profile)
 
     return nothing
+end
+
+@kernel inbounds = true function subtract_profile_kernel!(field, profile)
+    ij, k = @index(Global, NTuple)
+    field[ij, k] -= profile[k]
+end
+
+@kernel inbounds = true function add_profile_kernel!(field, profile)
+    ij, k = @index(Global, NTuple)
+    field[ij, k] += profile[k]
 end
 
 """$(TYPEDSIGNATURES)
@@ -344,7 +356,7 @@ function surface_pressure_tendency!(
     # for semi-implicit div_mean is calc at time step i-1 in vertical_integration!
     @. pres_tend -= ūv̄∇lnpₛ + div_mean      # add the -div_mean term in spectral, swap sign
 
-    pres_tend.data[1:1] .= 0                # for mass conservation
+    zero_first_mode!(pres_tend)              # for mass conservation
     return nothing
 end
 
@@ -372,17 +384,26 @@ function vertical_velocity!(
         throw(DimensionMismatch(σ_tend, div_sum_above, div_grid, uv∇lnp_sum_above, uv∇lnp))
 
     # Hoskins and Simmons, 1975 just before eq. (6)
-    Δσₖ = view(σ_levels_thick, 1:(nlayers - 1))'
-    σₖ_half = view(σ_levels_half, 2:nlayers)'
-    # TODO: broadcast issue here, that's why the .data are neeeded
-    σ_tend.data[:, 1:(nlayers - 1)] .= σₖ_half .* (div_mean_grid.data .+ ūv̄∇lnp.data) .-
-        (div_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* div_grid.data[:, 1:(nlayers - 1)]) .-
-        (uv∇lnp_sum_above.data[:, 1:(nlayers - 1)] .+ Δσₖ .* uv∇lnp.data[:, 1:(nlayers - 1)])
-
-    # mass flux σ̇ is zero at k=1/2 (not explicitly stored) and k=nlayers+1/2 (stored in layer k)
-    # set to zero for bottom layer then
-    σ_tend.data[:, nlayers] .= 0
+    arch = architecture(σ_tend)
+    launch!(arch, RingGridWorkOrder, size(σ_tend), vertical_velocity_kernel!,
+        σ_tend, div_sum_above, uv∇lnp_sum_above, uv∇lnp,
+        div_mean_grid, div_grid, ūv̄∇lnp, σ_levels_thick, σ_levels_half, nlayers)
     return nothing
+end
+
+@kernel inbounds = true function vertical_velocity_kernel!(
+        σ_tend, div_sum_above, uv∇lnp_sum_above, uv∇lnp,
+        div_mean_grid, div_grid, ūv̄∇lnp, σ_levels_thick, σ_levels_half, nlayers)
+    ij, k = @index(Global, NTuple)
+    if k < nlayers
+        σₖ_half = σ_levels_half[k + 1]
+        Δσₖ = σ_levels_thick[k]
+        σ_tend[ij, k] = σₖ_half * (div_mean_grid[ij] + ūv̄∇lnp[ij]) -
+            (div_sum_above[ij, k] + Δσₖ * div_grid[ij, k]) -
+            (uv∇lnp_sum_above[ij, k] + Δσₖ * uv∇lnp[ij, k])
+    else
+        σ_tend[ij, k] = 0
+    end
 end
 
 """
@@ -1184,8 +1205,14 @@ function linear_pressure_gradient!(
     # Tₖ being the reference temperature profile, the anomaly term T' = Tᵥ - Tₖ is calculated
     # vordiv_tendencies! include as R_dry*Tₖ*lnpₛ into the geopotential on which the operator
     # -∇² is applied in bernoulli_potential!
-    # TODO: Broadcast issue with LTA, conflicting broadcast styles
-    geopot.data .+= R_dry .* temp_profile' .* pres.data
+    arch = architecture(geopot)
+    launch!(arch, SpectralWorkOrder, size(geopot), linear_pressure_gradient_kernel!,
+        geopot, pres, temp_profile, R_dry)
 
     return nothing
+end
+
+@kernel inbounds = true function linear_pressure_gradient_kernel!(geopot, pres, temp_profile, R_dry)
+    lm, k = @index(Global, NTuple)
+    geopot[lm, k] += R_dry * temp_profile[k] * pres[lm]
 end

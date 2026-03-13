@@ -377,7 +377,7 @@ function implicit_correction!(
     zero_last_degree!(pres_tend)
     zero_last_degree!(temp_tend)
 
-    pres_tend.data[1:1] .= 0    # mass conservation
+    zero_first_mode!(pres_tend)  # mass conservation
 
     return nothing
 end

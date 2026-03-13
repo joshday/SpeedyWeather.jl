@@ -44,8 +44,15 @@ function linear_virtual_temperature!(
     # virtual temperature in both grid and spectral space
     # transform!(temp_virt, temp_virt_grid, diagn.dynamics.scratch_memory, S)
 
-    # TODO: broadcast with LTA doesn't work here becasue of a broadcast conflict (Tₖ and humid are different dimensions and array types)
-    return @. temp_virt.data = temp.data + (temp_average' * μ) * humid.data
+    arch = architecture(temp_virt)
+    return launch!(arch, SpectralWorkOrder, size(temp_virt), linear_virtual_temperature_kernel!,
+        temp_virt, temp, humid, temp_average, μ)
+end
+
+@kernel inbounds = true function linear_virtual_temperature_kernel!(
+        temp_virt, temp, humid, temp_average, μ)
+    lm, k = @index(Global, NTuple)
+    temp_virt[lm, k] = temp[lm, k] + (temp_average[k] * μ) * humid[lm, k]
 end
 
 @inline virtual_temperature(T, q, A::AbstractWetAtmosphere) = virtual_temperature(T, q, A.μ_virt_temp)

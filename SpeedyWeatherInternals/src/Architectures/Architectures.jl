@@ -6,7 +6,7 @@ export AbstractArchitecture
 export CPU, CPUStatic, GPU
 export CUDAGPU, MetalGPU, ROCGPU
 export array_type, on_architecture, architecture, device
-export convert_to_device, ismatching, compatible_array_types, nonparametric_type
+export ismatching, compatible_array_types, nonparametric_type
 export synchronize
 
 """
@@ -140,10 +140,6 @@ on_architecture(::CPU, a::Array) = a
 on_architecture(::CPU, a::BitArray) = a
 on_architecture(::CPU, a::SubArray{<:Any, <:Any, <:Array}) = a
 on_architecture(::CPU, a::StepRangeLen) = a
-
-# Convert arguments to GPU-compatible types
-@inline convert_to_device(arch, args) = args
-@inline convert_to_device(::CPU, args) = args
 
 KernelAbstractions.synchronize(arch::AbstractArchitecture) = KernelAbstractions.synchronize(arch.device)
 end

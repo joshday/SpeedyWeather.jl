@@ -12,7 +12,7 @@ const MtlGPU = GPU{Metal.MetalBackend}
 # extend functions from Architectures
 Architectures.array_type(::MtlGPU) = MtlArray
 Architectures.array_type(::Type{<:MtlGPU}) = MtlArray
-Architectures.array_type(::GPU, NF::Type, N::Int) = MtlArray{NF, N, Metal.PrivateStorage}
+Architectures.array_type(::MtlGPU, NF::Type, N::Int) = MtlArray{NF, N, Metal.PrivateStorage}
 
 Architectures.compatible_array_types(::MtlGPU) = (MtlArray, MtlDeviceArray)
 Architectures.compatible_array_types(::Type{<:MtlGPU}) = (MtlArray, MtlDeviceArray)
@@ -36,6 +36,4 @@ Architectures.on_architecture(::MtlGPU, a::SubArray{<:Any, <:Any, <:MtlArray}) =
 Architectures.on_architecture(::MtlGPU, a::SubArray{<:Any, <:Any, <:Array}) = MtlArray(a)
 Architectures.on_architecture(::MtlGPU, a::StepRangeLen) = a
 
-@inline Architectures.convert_to_device(::MtlGPU, args) = Metal.mtlconvert(args)
-@inline Architectures.convert_to_device(::MtlGPU, args::Tuple) = map(Metal.mtlconvert, args)
 end

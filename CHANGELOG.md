@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fix GPU scalar indexing: replace `.data[...]` broadcasts with proper kernels, fix extension method dispatch, remove dead `convert_to_device`, unify `geopotential!` CPU/GPU paths
 - Small fixes to improve Enzyme CI [#995](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/995)
 - JuliaActions Cache upgraded to v3 [#1001](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1001)
 - Remove `@Const` from kernels [#1000](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1000)

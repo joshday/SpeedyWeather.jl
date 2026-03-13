@@ -69,25 +69,14 @@ function geopotential!(
     (; atmosphere) = model
 
     arch = architecture(temp)
-    return if typeof(arch) <: GPU
-        launch!(arch, LinearWorkOrder, (size(temp, 1),), geopotential_kernel!, geopotential, temp, humid, orography, g, G, atmosphere)
-    else
-        geopotential_cpu!(geopotential, temp, humid, orography, g, G, atmosphere)
-    end
+    return launch!(arch, LinearWorkOrder, (size(temp, 1),), geopotential_kernel!, geopotential, temp, humid, orography, g, G, atmosphere)
 end
 
-function geopotential_cpu!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
-    nlayers = size(temp, 2)
-    return @inbounds for ij in eachgridpoint(geopotential)
-        geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
-    end
-end
-
-@kernel function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
+@kernel inbounds = true function geopotential_kernel!(geopotential, temp, humid, orography, gravity, Geopotential, atmosphere)
     ij = @index(Global, Linear)
     nlayers = size(temp, 2)
 
-    @inbounds geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
+    geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Geopotential.Δp_geopot_half, Geopotential.Δp_geopot_full, nlayers, atmosphere)
 end
 
 @propagate_inbounds function geopotential_compute!(ij, geopotential, temp, humid, orography, gravity, Δp_geopot_half, Δp_geopot_full, nlayers, atmosphere)
@@ -126,15 +115,21 @@ function geopotential!(
     # note these are not anomalies here as they are only in grid-point fields
 
     # BOTTOM FULL LAYER
-    # TODO: broadcasting with LTA issue here
-    geopot.data[:, nlayers] .= geopot_surf.data .+ temp_virt.data[:, nlayers] .* Δp_geopot_full[nlayers:nlayers]
+    arch = architecture(geopot)
+    launch!(arch, LinearWorkOrder, (size(geopot, 1),), geopotential_bottom_kernel!,
+        geopot, geopot_surf, temp_virt, Δp_geopot_full, nlayers)
 
     # OTHER FULL LAYERS, integrate two half-layers from bottom to top
-    arch = architecture(geopot)
     return launch!(
         arch, SpectralWorkOrder, (size(geopot, 1),), geopotential_spectral_kernel!,
         geopot, temp_virt, Δp_geopot_half, Δp_geopot_full, nlayers
     )
+end
+
+@kernel inbounds = true function geopotential_bottom_kernel!(
+        geopot, geopot_surf, temp_virt, Δp_geopot_full, nlayers)
+    lm = @index(Global, Linear)
+    geopot[lm, nlayers] = geopot_surf[lm] + temp_virt[lm, nlayers] * Δp_geopot_full[nlayers]
 end
 
 @kernel inbounds = true function geopotential_spectral_kernel!(

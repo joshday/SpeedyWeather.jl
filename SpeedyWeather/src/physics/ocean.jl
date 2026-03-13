@@ -376,9 +376,7 @@ function initialize!(
     # set land "sst" points (100% land only)
     return if ocean_model.mask
         masked_value = ocean_model.land_temperature
-        sst = progn.ocean.sea_surface_temperature.data
-        # TODO: broadcasting over views of Fields of GPUArrays doesn't work
-        sst[isnan.(sst)] .= masked_value
+        replace_nans!(progn.ocean.sea_surface_temperature, masked_value)
         mask!(progn.ocean.sea_surface_temperature, model.land_sea_mask, :land; masked_value)
     end
 end

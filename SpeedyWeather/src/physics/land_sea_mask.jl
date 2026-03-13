@@ -59,6 +59,22 @@ end
 end
 
 
+"""$(TYPEDSIGNATURES)
+Replace NaN values in `field` with `replacement`. GPU-safe kernel-based implementation."""
+function replace_nans!(field::AbstractField, replacement)
+    masked_val = convert(eltype(field), replacement)
+    arch = architecture(field)
+    launch!(arch, RingGridWorkOrder, size(field), replace_nan_kernel!, field, masked_val)
+    return field
+end
+
+@kernel inbounds = true function replace_nan_kernel!(field, replacement)
+    ijk = @index(Global, Cartesian)
+    if isnan(field[ijk])
+        field[ijk] = replacement
+    end
+end
+
 # also allow for land_sea_mask struct to be passed on, use .mask in that case
 @propagate_inbounds mask!(field::AbstractField, mask::AbstractLandSeaMask, args...; kwargs...) =
     mask!(field, mask.mask, args...; kwargs...)
