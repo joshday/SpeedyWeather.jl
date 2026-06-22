@@ -66,6 +66,7 @@ Other implemented reduced grids are
 - [`OctahedralClenshawGrid`](@ref OctahedralClenshawGrid), similar but based on equi-angle latitudes
 - [`HEALPixGrid`](@ref HEALPixGrid), an equal-area grid based on a [dodecahedron](https://en.wikipedia.org/wiki/Rhombic_dodecahedron) with 12 faces
 - [`OctaHEALPixGrid`](@ref OctaHEALPixGrid), an equal-area grid from the class of HEALPix grids but based on an octahedron.
+- [`ERA5Grid`](@ref ERA5Grid), the (non-octahedral) reduced Gaussian grid used by ECMWF's IFS and the ERA5 reanalysis
 
 An overview of these grids is visualised here, and a more detailed description follows below.
 
@@ -278,6 +279,60 @@ every ring starts at 0˚E, an offset of ``360/2n`` degrees is chosen similar to 
 the longitudinal points in the HEALPix grids
 ([HEALPixGrid](@ref HEALPixGrid) and [OctaHEALPixGrid](@ref OctaHEALPixGrid))
 are chosen. This allows for a more even distribution of grid points near the poles.
+
+## [ERA5 grid](@id ERA5Grid)
+
+(called `ERA5Grid`)
+
+```@example grids
+using CairoMakie, GeoMakie    # when using GLMakie, use interactive=true (default) for zoom and rotation
+
+# the N320 grid has 542,080 cells, far too fine to show its grid points and faces like the
+# coarser grids above, so we visualise a (synthetic) field on the grid instead
+grid = ERA5Grid(320)
+londs, latds = RingGrids.get_londlatds(grid)
+data = @. Float32(sind(2 * latds) * cosd(londs))
+field = Field(data, grid)
+
+globe(field, interactive = false)
+save("era5_grid_globe.png", ans) # hide
+nothing # hide
+```
+![ERA5Grid](era5_grid_globe.png)
+
+The `ERA5Grid` is the *classical* (non-octahedral) reduced Gaussian grid used by ECMWF's
+Integrated Forecasting System (IFS) and, in particular, the native grid of the
+[ERA5 reanalysis](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5). Like the
+[octahedral Gaussian grid](@ref OctahedralGaussianGrid) it places its rings on the
+[Gaussian latitudes](@ref FullGaussianGrid) of the equivalent [full Gaussian grid](@ref FullGaussianGrid)
+and reduces the number of longitude points towards the poles. The difference is *how* the reduction
+is defined: the octahedral grids follow the simple formula ``16 + 4j`` (longitude points on ring ``j``),
+whereas the classical reduced Gaussian grid tabulates the longitude counts per ring. These counts are
+chosen to be products of small primes (``2^a 3^b 5^c``) so that the longitudinal
+fast Fourier transform of the [Spherical Harmonic Transform](@ref) stays efficient.
+As with the octahedral grids, longitudes are equally spaced per ring starting at 0˚E (no offset).
+
+Because these longitude counts are tabulated and not formulaic, only the resolution used by ERA5 is
+implemented: `nlat_half = 320` (the ECMWF "N320" grid), with 640 latitude rings and 542,080 grid points,
+ranging from 18 longitude points on the rings closest to the poles to 1280 on the rings closest to the Equator.
+Constructing the grid at any other resolution throws an error.
+
+```@example grids
+using CairoMakie
+grid = ERA5Grid(320)
+latd = RingGrids.get_latd(grid)
+nlons = [RingGrids.get_nlon_per_ring(grid, j) for j in 1:RingGrids.get_nlat(grid)]
+
+lines(nlons, latd,
+    axis = (xlabel = "longitude points per ring", ylabel = "latitude [˚N]",
+        title = "ERA5Grid (N320): $(RingGrids.get_npoints(grid)) grid points"))
+save("era5_grid_nlons.png", ans) # hide
+nothing # hide
+```
+![ERA5Grid longitude points per ring](era5_grid_nlons.png)
+
+See [Loading ERA5 data](@ref) in the RingGrids documentation for how to wrap an ERA5 data array
+onto this grid.
 
 ## [Full Clenshaw-Curtis grid](@id FullClenshawGrid)
 

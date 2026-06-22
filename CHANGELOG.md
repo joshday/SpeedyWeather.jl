@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- ERA5Grid, the (non-octahedral) N320 reduced Gaussian grid used by ECMWF's IFS and ERA5 [#NNN](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/NNN)
 - ArrayWorkOrder instead of Array3DWorkOrder as both preserve dimensions [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
 - Allocation-free masked copy between RingGrids Field and subset array via mask [#1127](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1127)
 - Rename land-sea mask array land_fraction [#1219](https://github.com/SpeedyWeather/SpeedyWeather.jl/pull/1134)

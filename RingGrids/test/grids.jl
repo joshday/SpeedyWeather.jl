@@ -12,6 +12,7 @@ using JLArrays
             OctaHEALPixGrid,
             FullHEALPixGrid,
             FullOctaHEALPixGrid,
+            ERA5Grid,
         )
 
         full = RingGrids.full_grid_type(G)
@@ -23,6 +24,53 @@ using JLArrays
             @test G <: RingGrids.AbstractReducedGrid
         end
     end
+end
+
+@testset "ERA5Grid (N320)" begin
+    grid = ERA5Grid(320)
+
+    # only the N320 resolution is tabulated
+    @test_throws ArgumentError ERA5Grid(64)
+    @test_throws ArgumentError RingGrids.get_npoints(ERA5Grid, 64)
+    @test_throws ArgumentError RingGrids.get_nlat_half(ERA5Grid, 1234)
+
+    # type relationships
+    @test grid isa RingGrids.AbstractReducedGrid
+    @test RingGrids.full_grid_type(ERA5Grid) == FullGaussianGrid
+
+    # size
+    @test RingGrids.get_npoints(grid) == 542080
+    @test RingGrids.get_nlat(grid) == 640
+    @test RingGrids.get_nlat_half(ERA5Grid, 542080) == 320
+
+    # Gaussian latitudes identical to the equivalent FullGaussianGrid
+    @test RingGrids.get_latd(grid) == RingGrids.get_latd(FullGaussianGrid, 320)
+
+    # ring structure: 18 points at the poles, 1280 at the Equator, north-south symmetric
+    @test RingGrids.get_nlon_per_ring(grid, 1) == 18
+    @test RingGrids.get_nlon_per_ring(grid, 640) == 18
+    @test RingGrids.get_nlon_per_ring(grid, 320) == 1280
+    @test RingGrids.get_nlon_max(grid) == 1280
+    @test grid.rings[1] == 1:18
+    @test last(grid.rings[end]) == RingGrids.get_npoints(grid)
+
+    # eachring consistent with each_index_in_ring
+    rings = RingGrids.eachring(grid)
+    rings2 = [RingGrids.each_index_in_ring(grid, j) for j in 1:RingGrids.get_nlat(grid)]
+    @test rings == rings2
+
+    # longitudes equally spaced eastward from 0˚E
+    lond = RingGrids.get_lond_per_ring(ERA5Grid, 320, 1)
+    @test length(lond) == 18
+    @test lond ≈ collect(0:20:340)
+
+    # Field construction and interpolation to a full grid
+    field = Field(collect(1:RingGrids.get_npoints(grid)), grid)
+    @test field isa ERA5Field
+    @test field[1] == 1
+    full = interpolate(FullGaussianGrid, 24, field)
+    @test full isa FullGaussianField
+    @test RingGrids.get_npoints(full) == RingGrids.get_npoints(FullGaussianGrid, 24)
 end
 
 @testset "Field types" begin
@@ -47,6 +95,7 @@ end
             OctaminimalGaussianField,
             HEALPixField,
             OctaHEALPixField,
+            ERA5Field,
         )
 
         @test RingGrids.isreduced(F)

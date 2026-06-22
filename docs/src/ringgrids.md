@@ -149,6 +149,71 @@ which in general is `Array(field, as=Vector)` for no reshaping (equivalent to `f
 including possible conversion to `Array`) and `Array(field, as=Matrix)` with reshaping
 (full grids only).
 
+## Loading ERA5 data
+
+The native grid of the [ERA5 reanalysis](https://www.ecmwf.int/en/forecasts/dataset/ecmwf-reanalysis-v5)
+is the *classical* (non-octahedral) reduced Gaussian grid that ECMWF calls "N320", available as
+[`ERA5Grid`](@ref ERA5Grid) (see [ERA5 grid](@ref ERA5Grid) for the mathematical description).
+It is a reduced grid with [Gaussian latitudes](@ref FullGaussianGrid) and a tabulated number of
+longitude points per ring, so only the ERA5 resolution `nlat_half = 320` is supported.
+
+```@example ringgrids
+using RingGrids
+grid = ERA5Grid(320)
+```
+
+It has 640 latitude rings and 542,080 grid points
+
+```@example ringgrids
+RingGrids.get_npoints(grid)
+```
+
+ERA5 data on this grid comes as a single flat array with one value per grid point, ordered ring by
+ring from the north pole to the south pole and eastward from 0˚E on every ring -- exactly the
+[ring order](@ref "Creating a Field from data") that RingGrids uses. Wrapping such an array into a
+`Field` is therefore a single call. Here we use a smooth, geolocated test pattern as a stand-in for
+real data, using the longitudes and latitudes of every grid point
+
+```@example ringgrids
+londs, latds = get_londlatds(grid)                          # ˚E, ˚N per grid point
+data = @. Float32(sind(2 * latds) * cosd(londs))            # stand-in for an ERA5 field
+field = Field(data, grid)
+```
+
+Because `field` knows its grid, every value carries its geographic coordinate and we can, for
+example, interpolate it onto a regular [`FullGaussianGrid`](@ref FullGaussianGrid) (here coarse-grained
+for a quick plot) and visualise it
+
+```@example ringgrids
+using CairoMakie
+full = interpolate(FullGaussianGrid, 90, field)
+heatmap(full)
+```
+
+To load *actual* ERA5 data you only need to obtain that flat array of 542,080 values in ring order
+and wrap it as above. Two common sources are the
+[Climate Data Store](https://cds.climate.copernicus.eu) (which can deliver ERA5 on its native
+reduced Gaussian grid as GRIB) and the
+[Analysis-Ready, Cloud-Optimized (ARCO) ERA5](https://github.com/google-research/arco-era5) Zarr
+store on Google Cloud (whose model-level/native `co/` stores expose `latitude`/`longitude`
+coordinate arrays of length 542,080 with exactly this ring structure). For example, reading a GRIB
+message with [GRIB.jl](https://github.com/weech/GRIB.jl):
+
+```julia
+using GRIB, RingGrids
+
+GribFile("era5_native.grib") do f
+    msg = Message(f)                    # first message/field in the file
+    values = msg["values"]              # flat Vector of length 542,080 in ring order
+    @assert length(values) == RingGrids.get_npoints(ERA5Grid, 320)
+    field = Field(Float32.(values), ERA5Grid(320))
+    # ... use `field` like any other RingGrids Field
+end
+```
+
+Make sure the array is in ring order (north to south, eastward from 0˚E) and has the expected length;
+`Field(data, ERA5Grid(320))` throws a `DimensionMismatch` otherwise.
+
 ## Visualising Fields
 
 As only the full fields can be reshaped into a matrix, the underlying data structure of any `AbstractField`

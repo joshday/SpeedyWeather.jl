@@ -45,7 +45,8 @@ export OctahedralGaussianGrid,
     OctahedralClenshawGrid,
     HEALPixGrid,
     OctaHEALPixGrid,
-    OctaminimalGaussianGrid
+    OctaminimalGaussianGrid,
+    ERA5Grid
 
 # FIELDS (Data on grids)
 export AbstractField, AbstractField2D, AbstractField3D,
@@ -59,7 +60,8 @@ export FullGaussianField,
     OctahedralClenshawField,
     HEALPixField,
     OctaHEALPixField,
-    OctaminimalGaussianField
+    OctaminimalGaussianField,
+    ERA5Field
 
 export ColumnField,
     FullColumnField,
@@ -166,6 +168,7 @@ include("grids/octahedral_clenshaw.jl")
 include("grids/healpix.jl")
 include("grids/octahealpix.jl")
 include("grids/octaminimal_gaussian.jl")
+include("grids/era5_gaussian.jl")
 
 # INTEGRATION AND INTERPOLATION
 include("quadrature_weights.jl")

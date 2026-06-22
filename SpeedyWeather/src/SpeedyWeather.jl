@@ -78,7 +78,7 @@ export Field, Field2D, Field3D,
     FullHEALPixField, FullOctaHEALPixField,
     OctahedralGaussianField, OctahedralClenshawField,
     HEALPixField, OctaHEALPixField,
-    OctaminimalGaussianField
+    OctaminimalGaussianField, ERA5Field
 
 export ColumnField, ColumnField2D, ColumnField3D, ColumnField4D,
     FullColumnField, ReducedColumnField, transpose!
@@ -87,7 +87,7 @@ export FullClenshawGrid, FullGaussianGrid,
     FullHEALPixGrid, FullOctaHEALPixGrid,
     OctahedralGaussianGrid, OctahedralClenshawGrid,
     HEALPixGrid, OctaHEALPixGrid,
-    OctaminimalGaussianGrid
+    OctaminimalGaussianGrid, ERA5Grid
 
 export eachring, eachlayer, eachgridpoint
 export AnvilInterpolator
